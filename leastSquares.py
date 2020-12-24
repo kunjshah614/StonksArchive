@@ -1,5 +1,3 @@
-#TODO: Make indicator and plots optional inputs (if there is an indicator, plot it, otherwise dont)
-
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 import pandas as pd
@@ -8,6 +6,7 @@ import matplotlib.pyplot as plt
 import time as tm
 
 class returnVal:
+    #Used to return multiple variables from leastSquares fcn
     def __init__(self, m, b, error, cov):
         self.m = m
         self.b = b
@@ -19,19 +18,19 @@ def leastSquares(xVals, yVals, indicator, plots):
     A1 = np.transpose(np.asmatrix(xVals))
     A2 = np.transpose(np.asmatrix(np.ones(np.size(A1))))
     A = np.concatenate((A1, A2), axis = 1) #Formation of A matrix
-    Q, R = np.linalg.qr(A, mode = 'complete')
-    bmat = np.transpose(np.asmatrix(yVals))
-    x = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat)
+    Q, R = np.linalg.qr(A, mode = 'complete') #QR factorization to avoid a computationally expensive inverse
+    bmat = np.transpose(np.asmatrix(yVals)) #Formation of b vector
+    x = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat) #Computation of m and b in y = mx + b
     m = x[0, 0]
     b = x[1, 0]
-    error = np.round(np.sqrt(np.sum(np.square(b - (m*A1 + b*A2)))),2)
+    error = np.round(np.sqrt(np.sum(np.square(b - (m*A1 + b*A2)))),2) #Computation of euclidian norm
     cov = np.round(np.sum((xVals - np.mean(xVals))*(yVals - np.mean(yVals)))/np.size(yVals),2) #this doesn't seem to be right...
     
-    xpts = [np.min(A1), np.max(A1)]
-    ypts = [m*xpts[0] + b, m*xpts[1] + b]
+    xpts = [np.min(A1), np.max(A1)] #x pts for best fit line
+    ypts = [m*xpts[0] + b, m*xpts[1] + b] #y pts for best fit line
 
     if plots == True:
-        # Make the Plots RIGHT NOW ONLY SHOWS THE MOST CURRENT PLOT AND DELETES PREVIOUS
+        # Make the plots
         plt.figure(plt.gcf().number + 1)
         plt.title('Price Change vs ' + indicator)
         plt.xlabel(indicator)
@@ -80,7 +79,7 @@ aroonVals.rename('aroon', inplace = True)
 ADVals = ADData.loc[:, 'Chaikin A/D']
 ADVals.rename('AD', inplace = True)
 
-# Create additional data
+# Create dP/dt data
 closeDiff = -EMAVals.diff(periods = -1)
 
 # Line up all the data
@@ -114,5 +113,3 @@ AD = leastSquares(ADTotal['AD'].to_numpy(), ADTotal['EMA'].to_numpy(), 'AD', plo
 
 plt.close(1)
 plt.show()
-
-#test
