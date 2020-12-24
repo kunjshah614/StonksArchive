@@ -114,3 +114,5 @@ AD = leastSquares(ADTotal['AD'].to_numpy(), ADTotal['EMA'].to_numpy(), 'AD', plo
 
 plt.close(1)
 plt.show()
+
+#test
