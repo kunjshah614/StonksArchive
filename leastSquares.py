@@ -49,8 +49,8 @@ apiKey = 'TZPVUS2QURXT3WD5'
 ts = TimeSeries(key=apiKey,output_format='pandas')
 ti = TechIndicators(key=apiKey,output_format='pandas')
 
-inter = 'daily'
-ticker = 'TSLA'
+inter = '5min'
+ticker = 'NIO'
 tperiod = 20
 
 # Get data

@@ -1,15 +1,11 @@
 #Script to backtest trades
 
-#Update checkDayTrades fcn
-#Update buy fcn to update "stocks" sheet (most recent buy)
-#Add function to return the amount of a given stock (used outside of "backtest.py"
-
 from yahoo_fin import stock_info as si
 from datetime import datetime as dt
 import openpyxl as op
 import numpy as np
 
-testing = True #override trading hours restriction  
+testing = False #override trading hours restriction  
 
 def record(time, ticker, price, quantity): #if all checks pass, record the trade
     wb = op.load_workbook(filename = 'log.xlsx')
@@ -24,19 +20,20 @@ def record(time, ticker, price, quantity): #if all checks pass, record the trade
     sh['D' + str(currRow)] = quantity
     sh['E' + str(currRow)] = np.round(sh['E' + str(prevrow)].value - sh['C' + str(currRow)].value*quantity, 2)
     
-    sh = wb['Stocks'] #add stock to spreadsheet
+    sh = wb['Stocks'] #update stocks sheet
     nameFound = False
 
     for cell in sh['A']:
-        if(cell.value == ticker):
+        if(cell.value == ticker): #if the stock already exists
             if quantity < 0:
                 sh['B' + str(cell.row)] = time
             sh['C' + str(cell.row)] = sh['C' + str(cell.row)].value + quantity
             nameFound = True
-    if nameFound == False:
+    if nameFound == False: #if the stock does not exist (has never been bought before)
         currRow = sh.max_row + 1
         sh['A' + str(currRow)] = ticker
-    
+        sh['B' + str(currRow)] = time #this should only execute for an initial buy
+        sh['C' + str(currRow)] = quantity
     wb.save(filename = 'log.xlsx')
 
 def checkHours(t): #check trading hours
@@ -65,14 +62,14 @@ def checkBalance(price, quantity): #check balance
         wb.save(filename = 'log.xlsx')
         return False
     
-def checkQty(ticker, quantity): #PREVENTING TRADE FROM GOING THROUGH
+def checkQty(ticker, quantity): #check quantity of stock
     wb = op.load_workbook(filename = 'log.xlsx')
     sh = wb['Stocks'] #add stock to spreadsheet
     nameFound = False
 
-    for cell in sh['A']:
+    for cell in sh['A']: #look for the ticker
         if(cell.value == ticker):
-            if sh['C' + str(cell.row)].value >= quantity:
+            if sh['C' + str(cell.row)].value >= quantity: #see if there are enough stocks to sell
                 return True
             else:
                 print('Insufficient Stock Quantity')
@@ -81,16 +78,37 @@ def checkQty(ticker, quantity): #PREVENTING TRADE FROM GOING THROUGH
                 wb.save(filename = 'log.xlsx')
                 return False
             nameFound = True
-    if nameFound == False:
+    if nameFound == False: #if the stock isn't even on the list
         print('Insufficient Stock Quantity')
         sh = wb['Errors']
         sh['A3'] = 'YES'
         wb.save(filename = 'log.xlsx')
         return False
 
-def checkDayTrades(ticker): #FINISH THIS
-    return True
+def checkDayTrades(ticker, time):
+    wb = op.load_workbook(filename = 'log.xlsx')
+    sh = wb['Stocks'] #add stock to spreadsheet
     
+    for cell in sh['A']: #look for the ticker
+        if(cell.value == ticker):
+            if sh['B' + str(cell.row)].value.day == time.day:
+                print('Day Trade Executed')
+                sh = wb['Errors']
+                sh['A4'] = sh['A4'].value + 1
+                wb.save(filename = 'log.xlsx')
+    
+def qty (ticker):
+    wb = op.load_workbook(filename = 'log.xlsx')
+    sh = wb['Stocks']
+    nameFound = False
+    
+    for cell in sh['A']:
+        if(cell.value == ticker):
+            nameFound = True
+            return sh['C' + str(cell.row)].value
+    if nameFound == False:
+        return 0
+
 def buy(ticker, quantity):
     #check trading hours, balance
     
@@ -106,10 +124,10 @@ def sell(ticker, quantity):
     
     t = dt.now()
     price = si.get_live_price(ticker)
+    checkDayTrades(ticker, t)
     
     if checkHours(t): #check trading hours
         if checkQty(ticker, quantity): #check quantity of stocks
-            if checkDayTrades(ticker): #check day trades
-                record(t, ticker, price, -quantity) #record the trade
+            record(t, ticker, price, -quantity) #record the trade
 
-sell('NIO', 45)
+buy('PLUG', 3)
