@@ -23,15 +23,16 @@ def leastSquares(xVals, yVals, indicator, plots):
     x = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat) #Computation of m and b in y = mx + b
     m = x[0, 0]
     b = x[1, 0]
-    error = np.round(np.sqrt(np.sum(np.square(b - (m*A1 + b*A2)))),2) #Computation of euclidian norm
-    cov = np.round(np.sum((xVals - np.mean(xVals))*(yVals - np.mean(yVals)))/np.size(yVals),2) #this doesn't seem to be right...
-    
     xpts = [np.min(A1), np.max(A1)] #x pts for best fit line
     ypts = [m*xpts[0] + b, m*xpts[1] + b] #y pts for best fit line
+    error = np.round(np.sqrt(np.sum(np.square(b - (m*A1 + b*A2)))),2) #Computation of euclidian norm
+    
+    cov = np.round(np.sum((xVals - np.mean(xVals))*(yVals - np.mean(yVals)))/np.size(yVals),2) #this doesn't seem to be right...
 
     if plots == True:
         # Make the plots
         plt.figure(plt.gcf().number + 1)
+        plt.gcf().canvas.set_window_title(indicator)
         plt.title('Price Change vs ' + indicator)
         plt.xlabel(indicator)
         plt.ylabel('Price Change ($)')
@@ -48,8 +49,8 @@ apiKey = 'TZPVUS2QURXT3WD5'
 ts = TimeSeries(key=apiKey,output_format='pandas')
 ti = TechIndicators(key=apiKey,output_format='pandas')
 
-inter = '5min'
-ticker = 'NIO'
+inter = 'daily'
+ticker = 'TSLA'
 tperiod = 20
 
 # Get data
@@ -57,7 +58,6 @@ EMAData, _ = ti.get_ema(symbol = ticker, interval = inter, time_period = tperiod
 MACDData, _ = ti.get_macd(symbol = ticker, interval = inter, series_type = 'close')
 RSIData, _ = ti.get_rsi(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
 CCIData, _ = ti.get_cci(symbol = ticker, interval = inter, time_period = tperiod)
-VWAPData, _ = ti.get_vwap(symbol = ticker, interval = inter)
 tm.sleep(60)
 stochData, _ = ti.get_stoch(symbol = ticker, interval = inter)
 ADXData, _ = ti.get_adx(symbol = ticker, interval = inter, time_period = tperiod)
@@ -70,7 +70,6 @@ EMAVals = EMAData.loc[:,'EMA']
 MACDVals = MACDData.loc[:,'MACD']
 RSIVals = RSIData.loc[:,'RSI']
 CCIVals = CCIData.loc[:,'CCI']
-VWAPVals = VWAPData.loc[:, 'VWAP']
 stochVals = stochData.loc[:, 'SlowD']
 stochVals.rename('stoch', inplace = True)
 ADXVals = ADXData.loc[:,'ADX']
@@ -78,6 +77,7 @@ aroonVals = aroonData.loc[:,'Aroon Up'] - aroonData.loc[:,'Aroon Down']
 aroonVals.rename('aroon', inplace = True)
 ADVals = ADData.loc[:, 'Chaikin A/D']
 ADVals.rename('AD', inplace = True)
+OBVVals = OBVData.loc[:, 'OBV']
 
 # Create dP/dt data
 closeDiff = -EMAVals.diff(periods = -1)
@@ -89,8 +89,6 @@ RSITotal = pd.concat([closeDiff, RSIVals], axis = 1)
 RSITotal.dropna(inplace = True)
 CCITotal = pd.concat([closeDiff, CCIVals], axis = 1)
 CCITotal.dropna(inplace = True)
-VWAPTotal = pd.concat([closeDiff, VWAPVals], axis = 1)
-VWAPTotal.dropna(inplace = True)
 stochTotal = pd.concat([closeDiff, stochVals], axis = 1)
 stochTotal.dropna(inplace = True)
 ADXTotal = pd.concat([closeDiff, ADXVals], axis = 1)
@@ -99,17 +97,19 @@ aroonTotal = pd.concat([closeDiff, aroonVals], axis = 1)
 aroonTotal.dropna(inplace = True)
 ADTotal = pd.concat([closeDiff, ADVals], axis = 1)
 ADTotal.dropna(inplace = True)
+OBVTotal = pd.concat([closeDiff, OBVVals], axis = 1)
+OBVTotal.dropna(inplace = True)
 
 # Least Squares
 plots = True
 MACD = leastSquares(MACDTotal['MACD'].to_numpy(), MACDTotal['EMA'].to_numpy(), 'MACD', plots)
 RSI = leastSquares(RSITotal['RSI'].to_numpy(), RSITotal['EMA'].to_numpy(), 'RSI', plots)
 CCI = leastSquares(CCITotal['CCI'].to_numpy(), CCITotal['EMA'].to_numpy(), 'CCI', plots)
-VWAP = leastSquares(VWAPTotal['VWAP'].to_numpy(), VWAPTotal['EMA'].to_numpy(), 'VWAP', plots)
 stoch = leastSquares(stochTotal['stoch'].to_numpy(), stochTotal['EMA'].to_numpy(), 'Stochastic', plots)
 ADX = leastSquares(ADXTotal['ADX'].to_numpy(), ADXTotal['EMA'].to_numpy(), 'ADX', plots)
 aroon = leastSquares(aroonTotal['aroon'].to_numpy(), aroonTotal['EMA'].to_numpy(), 'aroon', plots)
 AD = leastSquares(ADTotal['AD'].to_numpy(), ADTotal['EMA'].to_numpy(), 'AD', plots)
+OBV = leastSquares(OBVTotal['OBV'].to_numpy(), OBVTotal['EMA'].to_numpy(), 'OBV', plots)
 
 plt.close(1)
 plt.show()
