@@ -97,7 +97,7 @@ def checkDayTrades(ticker, time):
                 sh['A4'] = sh['A4'].value + 1
                 wb.save(filename = 'log.xlsx')
     
-def qty (ticker):
+def qty(ticker):
     wb = op.load_workbook(filename = 'log.xlsx')
     sh = wb['Stocks']
     nameFound = False
@@ -129,5 +129,3 @@ def sell(ticker, quantity):
     if checkHours(t): #check trading hours
         if checkQty(ticker, quantity): #check quantity of stocks
             record(t, ticker, price, -quantity) #record the trade
-
-buy('PLUG', 3)
