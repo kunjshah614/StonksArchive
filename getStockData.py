@@ -1,14 +1,14 @@
 from alpha_vantage.techindicators import TechIndicators
+from alpha_vantage.timeseries import TimeSeries
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time as tm
 
-apiKey = '63SKE6NA9MIIRXO5'
-# apiKey = 'TZPVUS2QURXT3WD5'
-# apiKey = 'Q207WCDSVFKS8KOG'
+apiKey = 'IJLK8OCU49GD9XN0'
 ti = TechIndicators(key=apiKey,output_format='pandas')
-tperiod = 20
+ts = TimeSeries(key=apiKey,output_format='pandas')
+tperiod = 15
 # ind = ['EMA', 'MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV']
 
 class returnVal:
@@ -55,21 +55,31 @@ def leastSquares(xVals, yVals, indicator, plots):
 
 def getWeighting (ticker, inter):
     # Get data
-    print('1')
-    EMAData, _ = ti.get_ema(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
+    print('(Obtaining Historical Data from AlphaVantage)')
+#     EMAData, _ = ti.get_ema(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
+#     EMAData.sort_values(by = 'date', ascending = False, inplace = True)
+    PriceData, _ = ts.get_daily(symbol = ticker, outputsize = 'full')
     MACDData, _ = ti.get_macd(symbol = ticker, interval = inter, series_type = 'close')
+    MACDData.sort_values(by = 'date', ascending = False, inplace = True)
     RSIData, _ = ti.get_rsi(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
+    RSIData.sort_values(by = 'date', ascending = False, inplace = True)
     CCIData, _ = ti.get_cci(symbol = ticker, interval = inter, time_period = tperiod)
-    tm.sleep(60)
+    CCIData.sort_values(by = 'date', ascending = False, inplace = True)
     stochData, _ = ti.get_stoch(symbol = ticker, interval = inter)
+    stochData.sort_values(by = 'date', ascending = False, inplace = True)
     ADXData, _ = ti.get_adx(symbol = ticker, interval = inter, time_period = tperiod)
+    ADXData.sort_values(by = 'date', ascending = False, inplace = True)
     aroonData, _ = ti.get_aroon(symbol = ticker, interval = inter, time_period = tperiod)
+    aroonData.sort_values(by = 'date', ascending = False, inplace = True)
     ADData, _ = ti.get_ad(symbol = ticker, interval = inter)
+    ADData.sort_values(by = 'date', ascending = False, inplace = True)
     OBVData, _ = ti.get_obv(symbol = ticker, interval = inter)
+    OBVData.sort_values(by = 'date', ascending = False, inplace = True)
 
-    print('2')
+    print('(Extracting Data)')
     # Extract series from dataframe
-    EMAVals = EMAData.loc[:,'EMA']
+    PriceVals = PriceData.loc[:, '4. close'].rename('price', inplace = True)
+#     EMAVals = EMAData.loc[:,'EMA'].rename('price', inplace = True)
     MACDVals = MACDData.loc[:,'MACD']
     RSIVals = RSIData.loc[:,'RSI']
     CCIVals = CCIData.loc[:,'CCI']
@@ -79,51 +89,67 @@ def getWeighting (ticker, inter):
     ADVals = ADData.loc[:, 'Chaikin A/D'].rename('AD', inplace = True)
     OBVVals = OBVData.loc[:, 'OBV']
 
-    print('3')
     # Create dP/dt data
-    closeDiff = -EMAVals.diff(periods = -1)
+    closeDiff = -PriceVals.diff(periods = 1)
+#     closeDiff = -EMAVals.diff(periods = 1)
 
-    print('4')
     # Line up all the data
-    MACDTotal = pd.concat([closeDiff, MACDVals], axis = 1)
-    MACDTotal.dropna(inplace = True)
-    RSITotal = pd.concat([closeDiff, RSIVals], axis = 1)
-    RSITotal.dropna(inplace = True)
-    CCITotal = pd.concat([closeDiff, CCIVals], axis = 1)
-    CCITotal.dropna(inplace = True)
-    stochTotal = pd.concat([closeDiff, stochVals], axis = 1)
-    stochTotal.dropna(inplace = True)
-    ADXTotal = pd.concat([closeDiff, ADXVals], axis = 1)
-    ADXTotal.dropna(inplace = True)
-    aroonTotal = pd.concat([closeDiff, aroonVals], axis = 1)
-    aroonTotal.dropna(inplace = True)
-    ADTotal = pd.concat([closeDiff, ADVals], axis = 1)
-    ADTotal.dropna(inplace = True)
-    OBVTotal = pd.concat([closeDiff, OBVVals], axis = 1)
-    OBVTotal.dropna(inplace = True)
-
-    print('5')
-    # Least Squares (individual)
-    plots = False
-    MACD = leastSquares(MACDTotal['MACD'].to_numpy(), MACDTotal['EMA'].to_numpy(), 'MACD', plots)
-    RSI = leastSquares(RSITotal['RSI'].to_numpy(), RSITotal['EMA'].to_numpy(), 'RSI', plots)
-    CCI = leastSquares(CCITotal['CCI'].to_numpy(), CCITotal['EMA'].to_numpy(), 'CCI', plots)
-    stoch = leastSquares(stochTotal['stoch'].to_numpy(), stochTotal['EMA'].to_numpy(), 'Stochastic', plots)
-    ADX = leastSquares(ADXTotal['ADX'].to_numpy(), ADXTotal['EMA'].to_numpy(), 'ADX', plots)
-    aroon = leastSquares(aroonTotal['aroon'].to_numpy(), aroonTotal['EMA'].to_numpy(), 'aroon', plots)
-    AD = leastSquares(ADTotal['AD'].to_numpy(), ADTotal['EMA'].to_numpy(), 'AD', plots)
-    OBV = leastSquares(OBVTotal['OBV'].to_numpy(), OBVTotal['EMA'].to_numpy(), 'OBV', plots)
-
-    print('6')
-    # Linear Combination
-    w = np.array([MACD.corr, RSI.corr, CCI.corr, stoch.corr, ADX.corr, aroon.corr, AD.corr, OBV.corr])
-    w = w/w.sum()
-    total = pd.DataFrame({'Indicator': ['MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV'],
-                          'w': w,
-                          'm': [MACD.m, RSI.m, CCI.m, stoch.m, ADX.m, aroon.m, AD.m, OBV.m],
-                          'b': [MACD.b, RSI.b, CCI.b, stoch.b, ADX.b, aroon.b, AD.b, OBV.b]})
+#     MACDTotal = pd.concat([closeDiff, MACDVals], axis = 1)
+#     MACDTotal.dropna(inplace = True)
+#     RSITotal = pd.concat([closeDiff, RSIVals], axis = 1)
+#     RSITotal.dropna(inplace = True)
+#     CCITotal = pd.concat([closeDiff, CCIVals], axis = 1)
+#     CCITotal.dropna(inplace = True)
+#     stochTotal = pd.concat([closeDiff, stochVals], axis = 1)
+#     stochTotal.dropna(inplace = True)
+#     ADXTotal = pd.concat([closeDiff, ADXVals], axis = 1)
+#     ADXTotal.dropna(inplace = True)
+#     aroonTotal = pd.concat([closeDiff, aroonVals], axis = 1)
+#     aroonTotal.dropna(inplace = True)
+#     ADTotal = pd.concat([closeDiff, ADVals], axis = 1)
+#     ADTotal.dropna(inplace = True)
+#     OBVTotal = pd.concat([closeDiff, OBVVals], axis = 1)
+#     OBVTotal.dropna(inplace = True)
+# 
+#     # Least Squares (individual)
+#     print('(Least Squares)')
+#     plots = False
+#     MACD = leastSquares(MACDTotal['MACD'].to_numpy(), MACDTotal['price'].to_numpy(), 'MACD', plots)
+#     RSI = leastSquares(RSITotal['RSI'].to_numpy(), RSITotal['price'].to_numpy(), 'RSI', plots)
+#     CCI = leastSquares(CCITotal['CCI'].to_numpy(), CCITotal['price'].to_numpy(), 'CCI', plots)
+#     stoch = leastSquares(stochTotal['stoch'].to_numpy(), stochTotal['price'].to_numpy(), 'Stochastic', plots)
+#     ADX = leastSquares(ADXTotal['ADX'].to_numpy(), ADXTotal['price'].to_numpy(), 'ADX', plots)
+#     aroon = leastSquares(aroonTotal['aroon'].to_numpy(), aroonTotal['price'].to_numpy(), 'aroon', plots)
+#     AD = leastSquares(ADTotal['AD'].to_numpy(), ADTotal['price'].to_numpy(), 'AD', plots)
+#     OBV = leastSquares(OBVTotal['OBV'].to_numpy(), OBVTotal['price'].to_numpy(), 'OBV', plots)
+# 
+#     # Linear Combination
+#     w = np.array([MACD.corr, RSI.corr, CCI.corr, stoch.corr, ADX.corr, aroon.corr, AD.corr, OBV.corr])
+#     w = w/w.sum()
+#     total = pd.DataFrame({'Indicator': ['MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV'],
+#                           'w': w,
+#                           'm': [MACD.m, RSI.m, CCI.m, stoch.m, ADX.m, aroon.m, AD.m, OBV.m],
+#                           'b': [MACD.b, RSI.b, CCI.b, stoch.b, ADX.b, aroon.b, AD.b, OBV.b]})
     
-    print('7')
+    print('(Least Squares)')
+    Total = pd.concat([closeDiff, MACDVals, RSIVals, CCIVals, stochVals, ADXVals, aroonVals, ADVals, OBVVals], axis = 1)
+    Total.dropna(inplace = True)
+    A1 = np.transpose(np.asmatrix(Total['MACD'].to_numpy()))
+    A2 = np.transpose(np.asmatrix(Total['RSI'].to_numpy()))
+    A3 = np.transpose(np.asmatrix(Total['CCI'].to_numpy()))
+    A4 = np.transpose(np.asmatrix(Total['stoch'].to_numpy()))
+    A5 = np.transpose(np.asmatrix(Total['ADX'].to_numpy()))
+    A6 = np.transpose(np.asmatrix(Total['aroon'].to_numpy()))
+    A7 = np.transpose(np.asmatrix(Total['AD'].to_numpy()))
+    A8 = np.transpose(np.asmatrix(Total['OBV'].to_numpy()))
+#     A9 = np.transpose(np.asmatrix(np.ones(np.size(A1))))
+#     A = np.concatenate((A1, A2, A3, A4, A5, A6, A7, A8, A9), axis = 1)
+    A = np.concatenate((A1, A2, A3, A4, A5, A6, A7, A8), axis = 1)
+    Q, R = np.linalg.qr(A, mode = 'complete') #QR factorization to avoid a computationally expensive inverse
+    bmat = np.transpose(np.asmatrix(Total['price'].to_numpy())) #Formation of b vector
+    x = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat)
+    total = x
+    
     plt.close(1)
     plt.show()
     
@@ -131,20 +157,25 @@ def getWeighting (ticker, inter):
 
 def getCurrent(ticker, inter):
     # Get data
-    print('8')
-    EMAData, _ = ti.get_ema(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
+    print('(Getting Current Data from AlphaVantage)')
     MACDData, _ = ti.get_macd(symbol = ticker, interval = inter, series_type = 'close')
+    MACDData.sort_values(by = 'date', ascending = False, inplace = True)
     RSIData, _ = ti.get_rsi(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
+    RSIData.sort_values(by = 'date', ascending = False, inplace = True)
     CCIData, _ = ti.get_cci(symbol = ticker, interval = inter, time_period = tperiod)
-    tm.sleep(60)
+    CCIData.sort_values(by = 'date', ascending = False, inplace = True)
     stochData, _ = ti.get_stoch(symbol = ticker, interval = inter)
+    stochData.sort_values(by = 'date', ascending = False, inplace = True)
     ADXData, _ = ti.get_adx(symbol = ticker, interval = inter, time_period = tperiod)
+    ADXData.sort_values(by = 'date', ascending = False, inplace = True)
     aroonData, _ = ti.get_aroon(symbol = ticker, interval = inter, time_period = tperiod)
+    aroonData.sort_values(by = 'date', ascending = False, inplace = True)
     ADData, _ = ti.get_ad(symbol = ticker, interval = inter)
+    ADData.sort_values(by = 'date', ascending = False, inplace = True)
     OBVData, _ = ti.get_obv(symbol = ticker, interval = inter)
+    OBVData.sort_values(by = 'date', ascending = False, inplace = True)
     
-    print('9')
-    EMAVals = EMAData.loc[:,'EMA']
+    print('(Extracting Data)')
     MACDVals = MACDData.loc[:,'MACD']
     RSIVals = RSIData.loc[:,'RSI']
     CCIVals = CCIData.loc[:,'CCI']
@@ -154,8 +185,7 @@ def getCurrent(ticker, inter):
     ADVals = ADData.loc[:, 'Chaikin A/D'].rename('AD', inplace = True)
     OBVVals = OBVData.loc[:, 'OBV']
     
-    print('10')
-    info = np.array([MACDVals.iloc[-1], RSIVals.iloc[-1], CCIVals.iloc[-1], stochVals.iloc[-1], ADXVals.iloc[-1], aroonVals.iloc[-1], ADVals.iloc[-1], OBVVals.iloc[-1]])
+    info = np.array([MACDVals.iloc[0], RSIVals.iloc[0], CCIVals.iloc[0], stochVals.iloc[0], ADXVals.iloc[0], aroonVals.iloc[0], ADVals.iloc[0], OBVVals.iloc[0]])
     
 #     info = pd.DataFrame({'Indicator': ['MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV'],
 #                          'x':[MACDVals.iloc[-1], RSIVals.iloc[-1], CCIVals.iloc[-1], stochVals.iloc[-1], ADXVals.iloc[-1], aroonVals.iloc[-1], ADVals.iloc[-1], OBVVals.iloc[-1]]})
