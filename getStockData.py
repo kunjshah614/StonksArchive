@@ -9,10 +9,9 @@ apiKey = 'IJLK8OCU49GD9XN0'
 ti = TechIndicators(key=apiKey,output_format='pandas')
 ts = TimeSeries(key=apiKey,output_format='pandas')
 tperiod = 15
-# ind = ['EMA', 'MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV']
 
 class returnLeastSquares:
-        #Used to return multiple variables from leastSquares fcn
+    #Used to return multiple variables from leastSquares fcn
     def __init__(self, m, b, error, corr):
         self.m = m
         self.b = b
@@ -71,6 +70,7 @@ def getStockData(ticker, inter):
     EMAData, _ = ti.get_ema(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
     EMAData.sort_values(by = 'date', ascending = False, inplace = True)
     PriceData, _ = ts.get_daily(symbol = ticker, outputsize = 'full')
+    PriceData.sort_values(by = 'date', ascending = False, inplace = True)
     MACDData, _ = ti.get_macd(symbol = ticker, interval = inter, series_type = 'close')
     MACDData.sort_values(by = 'date', ascending = False, inplace = True)
     RSIData, _ = ti.get_rsi(symbol = ticker, interval = inter, time_period = tperiod, series_type = 'close')
@@ -103,15 +103,15 @@ def getStockData(ticker, inter):
     
     return returnStockData(EMAVals, PriceVals, MACDVals, RSIVals, CCIVals, stochVals, ADXVals, aroonVals, ADVals, OBVVals)
 
-def getWeightingSurface (ticker, inter):
+def getStats (ticker, inter):
     data = getStockData(ticker, inter)
  
     # Create dP/dt data
     closeDiff = -data.price.diff(periods = 1)
-#     closeDiff = -EMAVals.diff(periods = 1)
+#     closeDiff = -data.EMA.diff(periods = 1)
 
-    print('(Least Squares)')
     # Line up all the data
+    print('(Least Squares)')
     MACDTotal = pd.concat([closeDiff, data.MACD], axis = 1)
     MACDTotal.dropna(inplace = True)
     RSITotal = pd.concat([closeDiff, data.RSI], axis = 1)
@@ -143,39 +143,58 @@ def getWeightingSurface (ticker, inter):
     # Linear Combination
     w = np.array([MACD.corr, RSI.corr, CCI.corr, stoch.corr, ADX.corr, aroon.corr, AD.corr, OBV.corr])
     w = w/w.sum()
+    m = [MACD.m, RSI.m, CCI.m, stoch.m, ADX.m, aroon.m, AD.m, OBV.m]
+    b = [MACD.b, RSI.b, CCI.b, stoch.b, ADX.b, aroon.b, AD.b, OBV.b]
     
-    print('(Surface)')
     # Least Squares (surface)
-    Total = pd.concat([closeDiff, data.MACD, data.RSI, data.CCI, data.stoch, data.ADX, data.aroon, data.AD, data.OBV], axis = 1)
-    Total.dropna(inplace = True)
-    A1 = np.transpose(np.asmatrix(Total['MACD'].to_numpy()))
-    A2 = np.transpose(np.asmatrix(Total['RSI'].to_numpy()))
-    A3 = np.transpose(np.asmatrix(Total['CCI'].to_numpy()))
-    A4 = np.transpose(np.asmatrix(Total['stoch'].to_numpy()))
-    A5 = np.transpose(np.asmatrix(Total['ADX'].to_numpy()))
-    A6 = np.transpose(np.asmatrix(Total['aroon'].to_numpy()))
-    A7 = np.transpose(np.asmatrix(Total['AD'].to_numpy()))
-    A8 = np.transpose(np.asmatrix(Total['OBV'].to_numpy()))
+    print('(Surface)')
+    total = pd.concat([closeDiff, data.MACD, data.RSI, data.CCI, data.stoch, data.ADX, data.aroon, data.AD, data.OBV], axis = 1)
+    total.dropna(inplace = True)
+    A1 = np.transpose(np.asmatrix(total['MACD'].to_numpy()))
+    A2 = np.transpose(np.asmatrix(total['RSI'].to_numpy()))
+    A3 = np.transpose(np.asmatrix(total['CCI'].to_numpy()))
+    A4 = np.transpose(np.asmatrix(total['stoch'].to_numpy()))
+    A5 = np.transpose(np.asmatrix(total['ADX'].to_numpy()))
+    A6 = np.transpose(np.asmatrix(total['aroon'].to_numpy()))
+    A7 = np.transpose(np.asmatrix(total['AD'].to_numpy()))
+    A8 = np.transpose(np.asmatrix(total['OBV'].to_numpy()))
     A = np.concatenate((A1, A2, A3, A4, A5, A6, A7, A8), axis = 1)
     Q, R = np.linalg.qr(A, mode = 'complete') #QR factorization to avoid a computationally expensive inverse
-    bmat = np.transpose(np.asmatrix(Total['price'].to_numpy())) #Formation of b vector
-    surface = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat).tolist()
-    surface = [x for l in surface for x in l] #convert list of lists to a single list
+    bmat = np.transpose(np.asmatrix(total['price'].to_numpy())) #Formation of b vector
+    a = np.matmul(np.linalg.pinv(R),np.transpose(Q)*bmat).tolist()
+    a = [x for l in a for x in l] #convert list of lists to a single list
 
     plt.close(1)
     plt.show()
     
-    histData = pd.DataFrame({'Indicator': ['MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV'],
-                      'w': w,
-                      'm': [MACD.m, RSI.m, CCI.m, stoch.m, ADX.m, aroon.m, AD.m, OBV.m],
-                      'b': [MACD.b, RSI.b, CCI.b, stoch.b, ADX.b, aroon.b, AD.b, OBV.b],
-                      'a': surface})
+#     # Assign a reliability score to the stock (how well the stock can be predicted, historically)
+#     print('(Reliability)')
+#     rel = 0
+#     
+#     for i in range(len(total.index)):
+#         raw = total.iloc[i]
+#         input = raw.drop(labels = 'price').to_numpy()
+#         output = raw.loc['price']
+#         leastSquaresScore = (w*(m*input + b)).sum()
+#         surfScore = (a*input).sum()
+#         weight = abs(output - (surfScore + leastSquaresScore)/2)
+#         if ((leastSquaresScore > 0 and surfScore < 0) or (leastSquaresScore < 0 and surfScore > 0)):
+#             continue
+#         elif ((surfScore > 0 and output > 0) or (surfScore < 0 and output < 0)):
+#             rel = rel + weight
+#         else:
+#             rel = rel - weight
+#     print(rel)
+        
+    histData = pd.DataFrame({'Indicator': ['MACD', 'RSI', 'CCI', 'stoch', 'ADX', 'aroon', 'AD', 'OBV'], 'w': w, 'm': m, 'b': b, 'a': a})
     
     return histData
 
 def getCurrent(ticker, inter):
     data = getStockData(ticker, inter)
     
-    currentData = np.array([data.MACD.iloc[0], data.RSI.iloc[0], data.CCI.iloc[0], data.stoch.iloc[0], data.ADX.iloc[0], data.aroon.iloc[0], data.AD.iloc[0], data.OBV.iloc[0]])
+    dataPt = 0 #0 is today
+    
+    currentData = np.array([data.MACD.iloc[dataPt], data.RSI.iloc[dataPt], data.CCI.iloc[dataPt], data.stoch.iloc[dataPt], data.ADX.iloc[dataPt], data.aroon.iloc[dataPt], data.AD.iloc[dataPt], data.OBV.iloc[dataPt]])
     
     return currentData

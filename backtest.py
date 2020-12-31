@@ -108,6 +108,25 @@ def qty(ticker):
             return sh['C' + str(cell.row)].value
     if nameFound == False:
         return 0
+    
+def balance():
+    wb = op.load_workbook(filename = 'log.xlsx')
+    sh = wb['Trades']
+    amount = sh['E' + str(sh.max_row)].value
+    return amount
+
+def refresh(): # THIS NEEDS TO BE FINISHED STILL
+    t = dt.now()
+    
+    if (t.hour >= 9 and t.hour <= 16) or (t.hour == 16 and t.minute < 30) or testing == True: #try to execute a trade
+        wb = op.load_workbook(filename = 'log.xlsx', read_only = True)
+        sh = wb['Limit']
+        for cell in sh['B']:
+            if si.get_live_price(cell.value) <= sh['C' + str(cell.row)].value:
+                buy(ticker, sh['D' + str(cell.row)])
+                sh.delete_rows(cell.row)
+                #DELETE ROWS
+  # CASE FOR REMOVING LIMIT ORDERS AT THE END OF THE DAY
 
 def buy(ticker, quantity):
     #check trading hours, balance
@@ -129,3 +148,16 @@ def sell(ticker, quantity):
     if checkHours(t): #check trading hours
         if checkQty(ticker, quantity): #check quantity of stocks
             record(t, ticker, price, -quantity) #record the trade
+            
+def limitOrder(ticker, quantity, maxPrice):
+    wb = op.load_workbook(filename = 'log.xlsx')
+    sh = wb['Limit']
+    
+    currRow = sh.max_row + 1
+    
+    sh['A' + str(currRow)] = dt.now()
+    sh['B' + str(currRow)] = ticker
+    sh['C' + str(currRow)] = maxPrice
+    sh['D' + str(currRow)] = quantity
+    
+    wb.save(filename = 'log.xlsx')

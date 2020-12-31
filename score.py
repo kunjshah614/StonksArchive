@@ -3,13 +3,14 @@ import time as tm
 import numpy as np
 import pandas as pd
 import openpyxl as op
+from statistics import mean
 
 mData = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] #columns containing each type of data
 bData = ['J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q']
 wData = ['R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
 aData = ['Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG']
 
-pd.set_option('display.max_rows', None, 'display.max_columns', None)
+# pd.set_option('display.max_rows', None, 'display.max_columns', None)
 
 def populate(ticker, stockConstants, rowNumber, sh):
     for j in mData:
@@ -21,13 +22,28 @@ def populate(ticker, stockConstants, rowNumber, sh):
     for m in aData:
         sh[m + str(rowNumber)] = stockConstants.loc[aData.index(m),'a']
 
+def filter(predictions):
+    thresh = 0.1
+    remList = []
+    for i in range(len(predictions.index)):
+        raw = predictions.iloc[i]
+        ls = raw.loc['Pred (ls)']
+        surf = raw.loc['Pred (surf)']
+        avg = raw.loc['Average']
+        if ((ls < 0 and surf > 0) or (ls > 0 and surf < 0)): #check if the signs agree
+            remList.append(i)
+        elif abs(avg) < thresh: #check if the avg is above the threshold
+            remList.append(i)
+    predictions.drop(predictions.index[remList], inplace = True)
+    predictions.sort_values('Average', inplace = True, ascending = False)
+    return predictions
+
 def learn(tickerList, inter):
     wb = op.load_workbook(filename = 'stockData.xlsx') #open the workbook
     
     for i in tickerList: #for each of the tickers...
-        print('\n')
         print(i)
-        stockConstants = sd.getWeightingSurface(i, inter)
+        stockConstants = sd.getStats(i, inter)
         
         sh = wb[inter]
         nameFound = False
@@ -51,6 +67,7 @@ def predict(tickerList, inter):
     leastSquaresPred = []
     
     for i in tickerList:
+        tm.sleep(5)
         print('\n')
         print(i)
         x = sd.getCurrent(i, inter)
@@ -96,18 +113,20 @@ def predict(tickerList, inter):
                 surfScore = (a*x).sum()
                 leastSquaresPred.append(leastSquaresScore)
                 surfPred.append(surfScore)
-    leastSquaresPred = np.round(leastSquaresPred, 2)
-    surfPred = np.round(surfPred, 2)
+    leastSquaresPred = np.round(leastSquaresPred, 4)
+    surfPred = np.round(surfPred, 4)
+    avg = (leastSquaresPred + surfPred)/2
     allPred = pd.DataFrame({'ticker': tickerList,
                             'Pred (ls)': leastSquaresPred,
-                            'Pred (surf)': surfPred})
-#     allPred.sort_values('score', inplace = True)
+                            'Pred (surf)': surfPred,
+                            'Average': avg})
     return(allPred)
     
-tickerList = ['NIO', 'IBM', 'TSLA', 'PLUG', 'NKLA', 'MSFT', 'SNE', 'RIDE', 'FUV', 'FCEL', 'BLNK', 'CBAT', 'AMZN', 'AAPL', 'NVDA', 'ZM', 'FB', 'PYPL', 'CRM', 'AMD']
+tickerList = ['RIO', 'CBAT', 'CNI', 'ANTM', 'CB', 'TFC', 'SO', 'DE', 'PBR', 'USB', 'BP', 'DUK', 'CI', 'FDX', 'BDX', 'CL', 'ZTS', 'SNAP', 'PLD', 'SNP', 'BEKE', 'INFY', 'NVDA', 'NIO', 'CCI', 'RIDE', 'ZM', 'BLNK', 'FUV', 'PLUG', 'SPGI', 'TJX']
 print(len(tickerList))
 inter = 'daily'
-print('Estimated Time: %d minutes' %(2*np.size(tickerList)))
+print('Estimated Time: %d minutes' %(np.size(tickerList)))
 learn(tickerList, inter)
 ranking = predict(tickerList, inter)
+ranking = filter(ranking)
 print(ranking)
